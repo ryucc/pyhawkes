@@ -89,8 +89,9 @@ def _compute_weighted_impulses_at_events(data):
     N, S, C, Z, dt_max = data.N, data.S, data.C, data.Z, model.dt_max
     W = model.W
     mu, tau = model.impulse_model.mu, model.impulse_model.tau
+    delay = model.impulse_model.delay
     lmbda = np.zeros((N, model.K))
-    compute_weighted_impulses_at_events(S, C, Z, dt_max, W, mu, tau, lmbda)
+    compute_weighted_impulses_at_events(S, C, Z, dt_max, W, mu, tau,delay, lmbda)
     return lmbda
 
 # Precompute the weighted impulse responses
