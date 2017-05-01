@@ -224,7 +224,7 @@ cpdef compute_rate_at_events(
                 break
 
             if W[C[par], C[n]] > 0:
-                lmbda[n] += W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], dt_max)
+                lmbda[n] += W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]],delay[C[par], C[n]], dt_max)
 
 
 cpdef compute_weighted_impulses_at_events(
