@@ -817,6 +817,7 @@ class _DiscreteTimeNetworkHawkesModelBase(object):
         R = np.zeros((T+L, self.K))
 
         # Add the background rate
+        R += self.bias_model.lambda0[None,:] # add a 1xK
         R += self.bias_model.lambda0[None,:]
 
         iterator = progprint_xrange(T, perline=print_interval) if verbose else range(T)
@@ -1203,7 +1204,7 @@ class DiscreteTimeNetworkHawkesModelSpikeAndSlab(_DiscreteTimeNetworkHawkesModel
         """
         # Update the parents.
         # THIS MUST BE DONE IMMEDIATELY FOLLOWING WEIGHT UPDATES!
-        for p in self.data_list:
+        for p in self.data_list:# DiscreteTimeParents
             p.resample()
 
         # Update the bias model given the parents assigned to the background
@@ -1710,6 +1711,7 @@ class ContinuousTimeNetworkHawkesModel(ModelGibbsSampling):
         lambda0 = self.bias_model.lambda0
         W = self.weight_model.W_effective
         mu, tau = self.impulse_model.mu, self.impulse_model.tau
+        delay = self.impulse_model.delay
 
         # lmbda_manual = np.zeros(N)
         # impulse = self.impulse_model.impulse
@@ -1734,7 +1736,7 @@ class ContinuousTimeNetworkHawkesModel(ModelGibbsSampling):
         # Call cython function to evaluate instantaneous rate
         from pyhawkes.internals.continuous_time_helpers import compute_rate_at_events
         lmbda = np.zeros(N)
-        compute_rate_at_events(S, C, dt_max, lambda0, W, mu, tau, lmbda)
+        compute_rate_at_events(S, C, dt_max, lambda0, W, mu, tau,delay, lmbda)
 
         # assert np.allclose(lmbda_manual, lmbda)
 
