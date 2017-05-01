@@ -525,10 +525,11 @@ class ContinuousTimeParents(GibbsSampling):
         lambda0 = self.model.bias_model.lambda0
         W = self.model.weight_model.W_effective
         mu, tau = self.model.impulse_model.mu, self.model.impulse_model.tau
+        delay = self.model.impulse_model.delay
 
         ct_resample_Z_logistic_normal(
             S, C, Z, dt_max,
-            lambda0, W, mu, tau)
+            lambda0, W, mu, tau, delay)
 
         assert (Z > -2).all()
         assert (Z < np.arange(Z.shape[0])).all()
