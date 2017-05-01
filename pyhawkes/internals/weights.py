@@ -566,8 +566,9 @@ class SpikeAndSlabContinuousTimeGammaWeights(GibbsSampling):
         N, S, C, Z, dt_max = data.N, data.S, data.C, data.Z, self.model.dt_max
         W = self.W
         mu, tau = self.model.impulse_model.mu, self.model.impulse_model.tau
+        delay = self.model.impulse_model.delay
         lmbda = np.zeros((N, self.K))
-        compute_weighted_impulses_at_events(S, C, Z, dt_max, W, mu, tau, lmbda)
+        compute_weighted_impulses_at_events(S, C, Z, dt_max, W, mu, tau,delay, lmbda)
         return lmbda
 
     def _resample_A_given_W(self, data):
