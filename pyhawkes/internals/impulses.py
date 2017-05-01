@@ -3,6 +3,7 @@ from scipy.special import gammaln, psi
 
 from pybasicbayes.abstractions import GibbsSampling, MeanField, MeanFieldSVI
 from pyhawkes.internals.distributions import Dirichlet
+from pyhawkes.utils import utils
 
 class DirichletImpulseResponses(GibbsSampling, MeanField, MeanFieldSVI):
     """
@@ -333,7 +334,8 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
     Continuous time impulse response model with logistic normal
     impulse response functions.
     """
-    def __init__(self, model, mu_0=0., lmbda_0=1., alpha_0=1., beta_0=1.):
+    def __init__(self, model, mu_0=0., lmbda_0=1., alpha_0=1., beta_0=1.,delay_0 = 0.0,
+            normal_mu = 0.1, normal_sig = 0.3):
         self.model = model
         self.K = model.K
         self.dt_max = model.dt_max
@@ -342,6 +344,11 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
         self.lmbda_0 = lmbda_0
         self.alpha_0 = alpha_0
         self.beta_0 = beta_0
+
+        self.delay_0 = delay_0
+        self.normal_sig = normal_sig
+        self.normal_mu = normal_mu
+        self.delay = self.normal_mu*np.ones((self.K,self.K),dtype='double')
 
         from pyhawkes.utils.utils import sample_nig
         self.mu, self.tau = \
@@ -361,15 +368,20 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
         return t, ir
 
     # TODO: Rename this
-    def impulse(self, dt, k1, k2):
+    def impulse(self, dt, k1, k2, delay = 0):
         """
         Impulse response induced by an event on process k1 on
         the rate of process k2 at lag dt
         """
+        # delay added
+        dt = dt - self.delay[k1][k2]
         from pyhawkes.utils.utils import logit
         mu, tau, dt_max = self.mu[k1,k2], self.tau[k1,k2], self.dt_max
         Z = dt * (dt_max - dt)/dt_max * np.sqrt(2*np.pi/tau)
-        return 1./Z * np.exp(-tau/2. * (logit(dt/dt_max) - mu)**2)
+        temp = 1./Z * np.exp(-tau/2. * (logit(dt/dt_max) - mu)**2)
+        # should be -inf
+        temp[dt < 0] = 0
+        return temp
 
     def rvs(self, size=[]):
         """
@@ -419,6 +431,42 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
         self.mu, self.tau = \
             sample_nig(mu_post, lmbda_post, alpha_post, beta_post)
 
+
+        # Z is parent
+        # C is process
+        # S is event time
+        S = [x.S for x in self.model.data_list]
+        C = [x.C for x in self.model.data_list]
+        Z = [x.Z for x in self.model.data_list]
+        N_pts = 50
+        t = np.linspace(0, self.dt_max, N_pts)
+        pt = np.zeros(N_pts)
+        normal_sig = self.normal_sig
+        normal_mu = self.normal_mu
+        pt_prior = np.exp(-(t-normal_mu)**2/(2*normal_sig**2))/np.sqrt(2*np.pi*normal_sig**2) 
+        dt_max = self.dt_max
+        for k1 in range(self.K):
+            for k2 in range(self.K):
+                tt = np.zeros(N_pts)
+                for i in range(len(S)):
+                    s,c,z = S[i],C[i],Z[i]
+                    cind, pind = (c==k2), (c[z]==k1)
+                    igmask = (z != -1) # no parent
+                    inds = cind & pind & igmask
+                    if ~np.all(~inds):
+                        ds = s[inds] - s[z[inds]]
+                        ll = utils.logit(np.absolute(ds[None,:] - t[:,None]),dt_max)
+                        # logit grows too fast
+                        ll = np.minimum(ll,100)
+                        ll = (ll * self.tau[k1][k2] /2 - self.mu[k1][k2] ) ** 2
+                        tt = tt + np.sum(ll,1)
+                if (tt==0).all():
+                    self.delay[k1][k2] = 0
+                else:
+                    # exp grows too fast, normalize by e^-max(tt)
+                    tt = np.cumsum(pt_prior * np.exp(tt - np.max(tt)))
+                    delay =  t[np.flatnonzero(tt > np.random.uniform(0,tt[-1]))[0]]
+                    self.delay[k1][k2] = delay
         assert np.isfinite(self.mu).all()
         assert np.isfinite(self.tau).all()
 
