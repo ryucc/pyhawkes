@@ -20,11 +20,12 @@ cdef double SQRT_2PI = 2.5066282746310002
 cdef inline double logit(double p) nogil:
     return log(p / (1-p))
 
-cdef inline double ln_impulse(double dt, double mu, double tau, double dt_max) nogil:
+cdef inline double ln_impulse(double dt, double mu, double tau, double delay, double dt_max) nogil:
     """
     Impulse response induced by an event on process k1 on
     the rate of process k2 at lag dt
     """
+    dt = dt - delay
     if dt < 1e-8:
         return 0
 
@@ -36,7 +37,7 @@ cdef inline double ln_impulse(double dt, double mu, double tau, double dt_max) n
 
 cpdef ct_resample_Z_logistic_normal_serial(
     double[::1] S, long[::1] C, long[::1] Z, double dt_max,
-    double[::1] lambda0, double[:,::1] W, double[:,::1] mu, double[:,::1] tau):
+    double[::1] lambda0, double[:,::1] W, double[:,::1] mu, double[:,::1] tau, double[:,::1] delay):
 
 
     cdef int N = S.shape[0]
@@ -74,7 +75,7 @@ cpdef ct_resample_Z_logistic_normal_serial(
                 p[par] = 0
                 break
 
-            p[par] = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], dt_max)
+            p[par] = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], delay[C[par], C[n]], dt_max)
             denom += p[par]
 
         # Now sample forward, starting from the minimum viable parent
@@ -96,7 +97,7 @@ cpdef ct_resample_Z_logistic_normal_serial(
 
 cpdef ct_resample_Z_logistic_normal(
     double[::1] S, long[::1] C, long[::1] Z, double dt_max,
-    double[::1] lambda0, double[:,::1] W, double[:,::1] mu, double[:,::1] tau):
+    double[::1] lambda0, double[:,::1] W, double[:,::1] mu, double[:,::1] tau, double[:,::1] delay):
 
 
     cdef int N = S.shape[0]
@@ -134,7 +135,7 @@ cpdef ct_resample_Z_logistic_normal(
             if dt > dt_max-1e-8:
                 break
 
-            p = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], dt_max)
+            p = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], delay[C[par], C[n]], dt_max)
             denom = denom + p
 
         # Now sample forward, starting from the minimum viable parent
@@ -150,7 +151,7 @@ cpdef ct_resample_Z_logistic_normal(
                     continue
 
                 if dt <= dt_max - 1e-8:
-                    p = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], dt_max)
+                    p = W[C[par], C[n]] * ln_impulse(dt, mu[C[par], C[n]], tau[C[par], C[n]], delay[C[par], C[n]], dt_max)
                     acc = acc + p / denom
                     if u[n] < acc:
                         Z[n] = par
@@ -194,7 +195,7 @@ cpdef ct_compute_suff_stats(
 cpdef compute_rate_at_events(
     double[::1] S, long[::1] C, double dt_max,
     double[::1] lambda0, double[:,::1] W,
-    double[:,::1] mu, double[:,::1] tau,
+    double[:,::1] mu, double[:,::1] tau, double[:,::1] delay,
     double[::1] lmbda):
 
     # Compute the instantaneous rate at the individual events
@@ -228,7 +229,7 @@ cpdef compute_rate_at_events(
 
 cpdef compute_weighted_impulses_at_events(
     double[::1] S, long[::1] C, long[::1] Z, double dt_max,
-    double[:,::1] W, double[:,::1] mu, double[:,::1] tau,
+    double[:,::1] W, double[:,::1] mu, double[:,::1] tau,double[:,::1] delay,
     double[:,::1] lmbda
     ):
     # Compute the instantaneous rate at the individual events
@@ -252,4 +253,4 @@ cpdef compute_weighted_impulses_at_events(
             if dt >= dt_max-1e-8:
                 break
 
-            lmbda[n, cp] += W[cp, cn] * ln_impulse(dt, mu[cp, cn], tau[cp, cn], dt_max)
+            lmbda[n, cp] += W[cp, cn] * ln_impulse(dt, mu[cp, cn], tau[cp, cn], delay[cp, cn], dt_max)
