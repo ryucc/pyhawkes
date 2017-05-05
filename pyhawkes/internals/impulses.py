@@ -448,6 +448,7 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
         for k1 in range(self.K):
             for k2 in range(self.K):
                 tt = np.zeros(N_pts)
+                gt = np.ones(N_pts)
                 for i in range(len(S)):
                     s,c,z = S[i],C[i],Z[i]
                     cind, pind = (c==k2), (c[z]==k1)
@@ -455,18 +456,29 @@ class ContinuousTimeImpulseResponses(GibbsSampling):
                     inds = cind & pind & igmask
                     if ~np.all(~inds):
                         ds = s[inds] - s[z[inds]]
-                        ll = utils.logit(np.absolute(ds[None,:] - t[:,None]),dt_max)
+                        '''
+                        if min(ds) < min(t):
+                            print k1,k2
+                            exit(0)
+                        '''
+                        ll = -utils.logit(np.absolute(ds[None,:] - t[:,None]),dt_max)
                         # logit grows too fast
                         ll = np.minimum(ll,100)
+                        ll = np.maximum(ll,-100)
                         ll = (ll * self.tau[k1][k2] /2 - self.mu[k1][k2] ) ** 2
                         tt = tt + np.sum(ll,1)
+                        gt[t > min(ds)] = 0.0
+                tt = np.cumsum(pt_prior * np.exp(tt - np.max(tt))*gt)
                 if (tt==0).all():
                     self.delay[k1][k2] = 0
+                    #tt = np.cumsum(pt_prior)
+                    #delay =  t[np.flatnonzero(tt > np.random.uniform(0,tt[-1]))[0]]
+                    #self.delay[k1][k2] = delay
                 else:
                     # exp grows too fast, normalize by e^-max(tt)
-                    tt = np.cumsum(pt_prior * np.exp(tt - np.max(tt)))
-                    delay =  t[np.flatnonzero(tt > np.random.uniform(0,tt[-1]))[0]]
+                    delay = -t[np.flatnonzero(tt > np.random.uniform(0,tt[-1]))[0]]
                     self.delay[k1][k2] = delay
+
         assert np.isfinite(self.mu).all()
         assert np.isfinite(self.tau).all()
 
